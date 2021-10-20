@@ -1,0 +1,30 @@
+<RCC>
+    <qresource prefix="/resources">
+		<file alias="svg/pe">svg/pe.svg</file>
+		<file alias="svg/settings">svg/settings.svg</file>
+		<file alias="svg/help">svg/help.svg</file>
+		<file alias="svg/minimize">svg/minimize.svg</file>
+		<file alias="svg/maximize">svg/maximize.svg</file>
+		<file alias="svg/restore-down">svg/restore-down.svg</file>
+		<file alias="svg/close">svg/close.svg</file>
+        <file alias="svg/undo">svg/undo.svg</file>
+        <file alias="svg/redo">svg/redo.svg</file>
+        <file alias="svg/reset">svg/reset.svg</file>
+        <file alias="svg/copy-disabled">svg/copy-disabled.svg</file>
+        <file alias="svg/copy-hover">svg/copy-hover.svg</file>
+        <file alias="svg/copy-pressed">svg/copy-pressed.svg</file>
+        <file alias="svg/copy-rest">svg/copy-rest.svg</file>
+        <file alias="svg/pencil">svg/pencil.svg</file>
+		<file alias="svg/pencil-checked">svg/pencil-checked.svg</file>
+		<file alias="svg/arrow">svg/arrow.svg</file>
+		<file alias="svg/arrow-checked">svg/arrow-checked.svg</file>
+        <file alias="svg/box">svg/box.svg</file>
+		<file alias="svg/box-checked">svg/box-checked.svg</file>
+        <file alias="svg/ellipse">svg/ellipse.svg</file>
+		<file alias="svg/ellipse-checked">svg/ellipse-checked.svg</file>
+        <file alias="svg/star">svg/star.svg</file>
+		<file alias="svg/star-checked">svg/star-checked.svg</file>
+        <file alias="svg/triangle">svg/triangle.svg</file>
+		<file alias="svg/triangle-checked">svg/triangle-checked.svg</file>
+    </qresource>
+</RCC>
