@@ -26,5 +26,7 @@
 		<file alias="svg/star-checked">svg/star-checked.svg</file>
         <file alias="svg/triangle">svg/triangle.svg</file>
 		<file alias="svg/triangle-checked">svg/triangle-checked.svg</file>
+		<file alias="svg/pipette">svg/pipette.svg</file>
+		<file alias="svg/down-arrow">svg/down-arrow.svg</file>
     </qresource>
 </RCC>

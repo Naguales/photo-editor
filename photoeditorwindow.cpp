@@ -5,6 +5,10 @@
 #include <QFrame>
 #include <QApplication>
 #include <QDesktopWidget>
+#include <QValidator>
+#include <QRegExp>
+#include <QPainter>
+#include <QSignalBlocker>
 
 PhotoEditorWindow::PhotoEditorWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -27,7 +31,9 @@ void PhotoEditorWindow::init()
     setFont(appFont);
 
     QPalette palette = QApplication::palette();
+    m_defaultSystemPalette = palette;
     palette.setColor(QPalette::WindowText, Qt::white);
+    palette.setColor(QPalette::Text, Qt::white);
     QApplication::setPalette(palette);
 
     createWidgets();
@@ -116,6 +122,26 @@ void PhotoEditorWindow::createWidgets()
     m_headerToolBar->setFixedHeight(qRound(Constants::HEADER_TOOL_BAR_HEIGHT_PX * m_scaleFactor));
     m_headerToolBar->setStyleSheet(toolBarStyleSheet);
 
+    m_openFileAction = new QAction(tr("Open file"), m_headerToolBar);
+    m_openFileAction->setShortcuts(QKeySequence::Open);
+    m_saveFileAction = new QAction(tr("Save"), m_headerToolBar);
+    m_saveFileAction->setShortcuts(QKeySequence::Save);
+    m_saveAsFileAction = new QAction(tr("Save as..."), m_headerToolBar);
+    m_saveAsFileAction->setShortcuts(QKeySequence::SaveAs);
+    m_printAction = new QAction(tr("Print"), m_headerToolBar);
+    m_printAction->setShortcuts(QKeySequence::Print);
+
+    m_fileMenu = new QMenu(tr("File"), m_headerToolBar);
+    m_fileMenu->addAction(m_openFileAction);
+    m_fileMenu->addSeparator();
+    m_fileMenu->addAction(m_saveFileAction);
+    m_fileMenu->addAction(m_saveAsFileAction);
+    m_fileMenu->addSeparator();
+    m_fileMenu->addAction(m_printAction);
+
+    m_menuBar = new QMenuBar(m_headerToolBar);
+    m_menuBar->addMenu(m_fileMenu);
+
     m_undoButton = new QToolButton(m_headerToolBar);
     m_undoButton->setIcon(QIcon(":/resources/svg/undo"));
     m_undoButton->setStyleSheet(sToolButtonStyleSheet);
@@ -134,6 +160,11 @@ void PhotoEditorWindow::createWidgets()
 
     QWidget* headerSpacer = new QWidget(m_headerToolBar);
     headerSpacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    auto menuBarVBoxLayout = new QVBoxLayout;
+    menuBarVBoxLayout->setMenuBar(m_menuBar);
+    auto menuBarWidget = new QWidget(m_headerToolBar);
+    menuBarWidget->setLayout(menuBarVBoxLayout);
+    m_headerToolBar->addWidget(menuBarWidget);
     m_headerToolBar->addWidget(m_undoButton);
     m_headerToolBar->addWidget(m_redoButton);
     m_headerToolBar->addWidget(m_resetButton);
@@ -202,6 +233,62 @@ void PhotoEditorWindow::createWidgets()
     m_drawToolsBar->addWidget(m_triangleDrawToolButton);
     m_drawToolsBar->addWidget(m_starDrawToolButton);
     m_drawToolsBar->addWidget(drawToolsBarSpacerRight);
+
+    // --------------------------------------------------------------------------
+    // Draw Tools Settings toolbar
+
+    const QString sOpacityLineEditStyleSheet = opacityLineEditStyleSheet(),
+            sOpacitySliderStyleSheet = opacitySliderStyleSheet(),
+            sRoundToolButtonStyleSheet = roundToolButtonStyleSheet(),
+            sRoundComboboxStyleSheet = roundComboboxStyleSheet();
+
+    m_drawToolsSettingsPanel = new QWidget(m_centralWidget);
+
+    m_opacityLabel = new QLabel(tr("Opacity image"), m_drawToolsSettingsPanel);
+
+    m_opacitySlider = new QSlider(Qt::Horizontal, m_drawToolsSettingsPanel);
+    m_opacitySlider->setRange(0, Constants::SLIDER_MAX_VALUE);
+    m_opacitySlider->setValue(Constants::SLIDER_MAX_VALUE);
+    m_opacitySlider->setStyleSheet(sOpacitySliderStyleSheet);
+
+    m_opacityLineEdit = new QLineEdit(m_drawToolsSettingsPanel);
+    m_opacityLineEdit->setFixedWidth(qRound(Constants::OPACITY_LINE_EDIT_WIDTH_PX * m_scaleFactor));
+    m_opacityLineEdit->setStyleSheet(sOpacityLineEditStyleSheet);
+    QRegExp rx("^([1-9][0-9]{0,1}|100)$");
+    auto* opacityVaidator = new QRegExpValidator(rx, m_opacityLineEdit);
+    m_opacityLineEdit->setValidator(opacityVaidator);
+    m_opacityLineEdit->setText(QString::number(Constants::SLIDER_MAX_VALUE));
+
+    m_outlineColorLabel = new QLabel(tr("Outline color"), m_drawToolsSettingsPanel);
+
+    m_pipetteToolButton = new QToolButton(m_drawToolsSettingsPanel);
+    m_pipetteToolButton->setIcon(QIcon(":/resources/svg/pipette"));
+    m_pipetteToolButton->setStyleSheet(sRoundToolButtonStyleSheet);
+
+    m_colorDialog = new QColorDialog(this);
+    auto colorDialogPalette = m_defaultSystemPalette;
+    colorDialogPalette.setColor(QPalette::WindowText, Qt::black);
+    colorDialogPalette.setColor(QPalette::Text, Qt::black);
+    m_colorDialog->setPalette(colorDialogPalette);
+
+    m_colorCombobox = new QComboBox(m_drawToolsSettingsPanel);
+    m_colorCombobox->setStyleSheet(sRoundComboboxStyleSheet);
+
+    // --------------------------------------------------------------------------
+    // Footer toolbar
+
+    m_footerToolBar = new QToolBar(m_centralWidget);
+    m_footerToolBar->setMovable(false);
+    m_footerToolBar->setFixedHeight(qRound(Constants::HEADER_TOOL_BAR_HEIGHT_PX * m_scaleFactor));
+    m_footerToolBar->setStyleSheet(toolBarStyleSheet);
+
+    // --------------------------------------------------------------------------
+    // Photo zone
+
+    m_photoScene = new QGraphicsScene(this);
+    m_photoView = new QGraphicsView(m_photoScene);
+    m_photoView->setStyleSheet(QString("QGraphicsView { margin: 50px; }"));
+    m_photoView->show();
 }
 
 void PhotoEditorWindow::createLayout()
@@ -225,10 +312,34 @@ void PhotoEditorWindow::createLayout()
     drawToolsVBoxLayout->setContentsMargins(drawToolsPanelMarginSide, drawToolsPanelMarginTop, drawToolsPanelMarginSide, drawToolsPanelMarginTop);
     m_drawToolsPanel->setLayout(drawToolsVBoxLayout);
 
+    auto horizontalLineDrawToolsSettings = createHorizontalLine(m_drawToolsSettingsPanel);
+    auto opacityHBoxLayout = new QHBoxLayout;
+    opacityHBoxLayout->addWidget(m_opacitySlider);
+    opacityHBoxLayout->addWidget(m_opacityLineEdit);
+
+    auto opacityVBoxLayout = new QVBoxLayout;
+    opacityVBoxLayout->addWidget(m_opacityLabel);
+    opacityVBoxLayout->addLayout(opacityHBoxLayout);
+
+    auto outlineHBoxLayout = new QHBoxLayout;
+    outlineHBoxLayout->addWidget(m_outlineColorLabel);
+    outlineHBoxLayout->addStretch(1);
+    outlineHBoxLayout->addWidget(m_pipetteToolButton);
+    outlineHBoxLayout->addWidget(m_colorCombobox);
+
+    auto drawToolsSettingsVBoxLayout = new QVBoxLayout;
+    drawToolsSettingsVBoxLayout->addLayout(opacityVBoxLayout);
+    drawToolsSettingsVBoxLayout->addLayout(outlineHBoxLayout);
+    drawToolsSettingsVBoxLayout->addWidget(horizontalLineDrawToolsSettings);
+
+    m_drawToolsSettingsPanel->setLayout(drawToolsSettingsVBoxLayout);
+
     m_mainLayout->addWidget(m_titleToolBar);
     m_mainLayout->addWidget(m_headerToolBar);
     m_mainLayout->addWidget(m_drawToolsPanel);
     m_mainLayout->addWidget(horizontalLineDrawTools);
+    m_mainLayout->addWidget(m_drawToolsSettingsPanel);
+    m_mainLayout->addWidget(m_footerToolBar);
 
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
 
@@ -253,6 +364,36 @@ void PhotoEditorWindow::createConnections()
     });
     connect(m_closeButton, &QToolButton::clicked, [&]() {
         close();
+    });
+    connect(m_drawToolsButtonGroup, QOverload<QAbstractButton *, bool>::of(&QButtonGroup::buttonToggled),
+        [=](QAbstractButton *button, bool checked){
+        button->setChecked(checked);
+    });
+    connect(m_opacitySlider, &QSlider::valueChanged, [&](int value) {
+        QSignalBlocker blocker(m_opacityLineEdit);
+        m_opacityLineEdit->setText(QString::number(value));
+    });
+    connect(m_opacityLineEdit, &QLineEdit::textChanged, [&](const QString& value) {
+        QSignalBlocker blocker(m_opacitySlider);
+        m_opacitySlider->setValue(value.toInt());
+    });
+    connect(m_pipetteToolButton, &QToolButton::clicked, [&]() {
+        m_colorDialog->show();
+    });
+    connect(m_colorDialog, &QColorDialog::colorSelected, [&](const QColor& color) {
+        const int iconSize = m_colorCombobox->style()->pixelMetric(QStyle::PM_LargeIconSize) * 2;
+        QPixmap pixmap(iconSize, iconSize);
+        pixmap.fill(QColor(255, 0, 0, 0));
+        QPainter painter(&pixmap);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        QBrush brush(color);
+        painter.setBrush(brush);
+        painter.drawEllipse(pixmap.rect());
+        QIcon icon(pixmap);
+        const int itemsCount = m_colorCombobox->count();
+        m_colorCombobox->addItem(icon, "");
+        m_colorCombobox->setItemData(itemsCount, Qt::AlignCenter, Qt::TextAlignmentRole);
+        m_colorCombobox->setCurrentIndex(itemsCount);
     });
 }
 
@@ -352,4 +493,61 @@ QString PhotoEditorWindow::checkableDrawToolButtonStyleSheet(const QString& norm
     checkableDrawToolButtonStyleSheet.append(QString("QToolButton:hover { qproperty-icon: url(%1); background-color: %2; border-color: %2; }")
                                              .arg(pressedIconUrl, Constants::DRAW_TOOL_BUTTON_PRESSED_COLOR));
     return checkableDrawToolButtonStyleSheet;
+}
+
+QString PhotoEditorWindow::opacityLineEditStyleSheet()
+{
+    const int opacityLineEditBorder = qRound(Constants::OPACITY_LINE_EDIT_BORDER_PX * m_scaleFactor),
+            opacityLineEditBorderRadius = qRound(Constants::OPACITY_LINE_EDIT_BORDER_RADIUS_PX * m_scaleFactor);
+
+    QString opacityLineEditStyleSheet = QString("QLineEdit { border: %1px solid %2; border-radius: %3; }")
+            .arg(opacityLineEditBorder).arg(Constants::OPACITY_LINE_EDIT_BORDER_COLOR).arg(opacityLineEditBorderRadius);
+    return opacityLineEditStyleSheet;
+}
+
+QString PhotoEditorWindow::opacitySliderStyleSheet()
+{
+    const int opacitySliderGrooveHeight = qRound(Constants::OPACITY_SLIDER_GROOVE_HEIGHT_PX * m_scaleFactor),
+            opacitySliderGrooveBorderRadius = qRound(Constants::OPACITY_SLIDER_GROOVE_BORDER_RADIUS_PX * m_scaleFactor),
+            opacitySliderHandleBorderRadius = qRound(Constants::OPACITY_SLIDER_HANDLE_BORDER_RADIUS_PX * m_scaleFactor),
+            opacitySliderHandleWidth = qRound(Constants::OPACITY_SLIDER_HANDLE_WIDTH_PX * m_scaleFactor),
+            opacitySliderHandleHeight = qRound(Constants::OPACITY_SLIDER_HANDLE_HEIGHT_PX * m_scaleFactor),
+            opacitySliderHandleBorder = qRound(Constants::OPACITY_SLIDER_HANDLE_BORDER_PX * m_scaleFactor),
+            opacitySliderHandleMargin = -qRound(opacitySliderHandleBorderRadius * 0.5);
+
+    QString opacitySliderStyleSheet = QString("QSlider::groove:horizontal { background-color: %1; height: %2px; border-radius: %3px; }")
+            .arg(Constants::OPACITY_SLIDER_GROOVE_COLOR).arg(opacitySliderGrooveHeight).arg(opacitySliderGrooveBorderRadius);
+    opacitySliderStyleSheet.append(QString("QSlider::handle:horizontal { background-color: %1; border: %2px solid %1; width: %3px; height: %4px; line-height: %4px; margin-top: %5px; margin-bottom: %5px; border-radius: %6px; }")
+            .arg(Constants::OPACITY_SLIDER_HANDLE_COLOR).arg(opacitySliderHandleBorder).arg(opacitySliderHandleWidth).arg(opacitySliderHandleHeight)
+            .arg(opacitySliderHandleMargin).arg(opacitySliderHandleBorderRadius));
+    opacitySliderStyleSheet.append(QString("QSlider::handle:horizontal:hover { border-radius: %1px; }").arg(opacitySliderHandleBorderRadius));
+    return opacitySliderStyleSheet;
+}
+
+QString PhotoEditorWindow::roundToolButtonStyleSheet()
+{
+    const int roundToolButtonBorderRadius = qRound(Constants::ROUND_TOOL_BUTTON_BORDER_RADIUS_PX * m_scaleFactor);
+
+    QString roundToolButtonStyleSheet = toolButtonStyleSheet();
+    roundToolButtonStyleSheet.append(QString("QToolButton { border-radius: %1px;}").arg(roundToolButtonBorderRadius));
+    return roundToolButtonStyleSheet;
+}
+
+QString PhotoEditorWindow::roundComboboxStyleSheet()
+{
+    const int toolButtonSize = qRound(Constants::TOOL_BUTTON_SIZE_PX * m_scaleFactor),
+            toolButtonBorderRadius = qRound(Constants::ROUND_TOOL_BUTTON_BORDER_RADIUS_PX * m_scaleFactor),
+            roundComboboxDownArrowSize = qRound(Constants::ROUND_COMBO_BOX_DOWN_ARROW_SIZE * m_scaleFactor);
+
+    QString roundComboboxStyleSheet = QString("QComboBox { width: %1px; height: %1px; background-color: %2; border: 1px solid %2; border-radius: %3px; }")
+            .arg(toolButtonSize).arg(Constants::TOOL_BUTTON_REST_COLOR).arg(toolButtonBorderRadius);
+    roundComboboxStyleSheet.append(QString("QComboBox:hover { background-color: %1; border-color: %1; }")
+                                .arg(Constants::TOOL_BUTTON_HOVER_COLOR));
+    roundComboboxStyleSheet.append(QString("QComboBox:pressed { background-color: %1; border-color: %1; }")
+                                .arg(Constants::TOOL_BUTTON_PRESSED_COLOR));
+    roundComboboxStyleSheet.append(QString("QComboBox:disabled { background-color: %1; border-color: %1; }")
+                                .arg(Constants::TOOL_BUTTON_DISABLED_COLOR));
+    roundComboboxStyleSheet.append(QString("QComboBox:down-arrow { image: url(%1); width: %2px; height: %2px; }")
+                                .arg(":/resources/svg/down-arrow").arg(roundComboboxDownArrowSize));
+    return roundComboboxStyleSheet;
 }

@@ -2,11 +2,20 @@
 #define PHOTOEDITORWINDOW_H
 
 #include <QMainWindow>
+#include <QMenu>
+#include <QMenuBar>
+#include <QAction>
 #include <QToolBar>
 #include <QToolButton>
 #include <QPushButton>
 #include <QButtonGroup>
 #include <QLabel>
+#include <QSlider>
+#include <QLineEdit>
+#include <QComboBox>
+#include <QColorDialog>
+#include <QGraphicsScene>
+#include <QGraphicsView>
 #include <QVBoxLayout>
 
 class PhotoEditorWindow : public QMainWindow
@@ -43,6 +52,10 @@ private:
                                  const QString& disabledIconUrl = QString());
     QString checkableDrawToolButtonStyleSheet(const QString& normalIconUrl,
                                               const QString& pressedIconUrl = QString());
+    QString opacityLineEditStyleSheet();
+    QString opacitySliderStyleSheet();
+    QString roundToolButtonStyleSheet();
+    QString roundComboboxStyleSheet();
 
     // --------------------------------------------------------------------------
     // Title toolbar
@@ -60,13 +73,19 @@ private:
     // Header toolbar
 
     QToolBar* m_headerToolBar { nullptr };
+    QMenuBar* m_menuBar { nullptr };
+    QMenu* m_fileMenu { nullptr };
+    QAction* m_openFileAction { nullptr };
+    QAction* m_saveFileAction { nullptr };
+    QAction* m_saveAsFileAction { nullptr };
+    QAction* m_printAction { nullptr };
     QToolButton* m_undoButton { nullptr };
     QToolButton* m_redoButton { nullptr };
     QToolButton* m_resetButton { nullptr };
     QPushButton* m_copyButton { nullptr };
 
     // --------------------------------------------------------------------------
-    // Draw Tools toolbar
+    // Draw Tools bar
 
     QWidget* m_drawToolsPanel { nullptr };
     QLabel* m_drawToolsLabel { nullptr };
@@ -78,6 +97,30 @@ private:
     QToolButton* m_ellipseDrawToolButton { nullptr };
     QToolButton* m_triangleDrawToolButton { nullptr };
     QToolButton* m_starDrawToolButton { nullptr };
+
+    // --------------------------------------------------------------------------
+    // Draw Tools Settings bar
+
+    QWidget* m_drawToolsSettingsPanel { nullptr };
+    QLabel* m_opacityLabel { nullptr };
+    QSlider* m_opacitySlider { nullptr };
+    QLineEdit* m_opacityLineEdit { nullptr };
+    QLabel* m_outlineColorLabel { nullptr };
+    QToolButton* m_pipetteToolButton { nullptr };
+    QColorDialog* m_colorDialog { nullptr };
+    QComboBox* m_colorCombobox { nullptr };
+    QPalette m_defaultSystemPalette;
+
+    // --------------------------------------------------------------------------
+    // Footer toolbar
+
+    QToolBar* m_footerToolBar { nullptr };
+
+    // --------------------------------------------------------------------------
+    // Photo zone
+
+    QGraphicsScene* m_photoScene { nullptr };
+    QGraphicsView* m_photoView { nullptr };
 
     // --------------------------------------------------------------------------
     // Photo Editor window
