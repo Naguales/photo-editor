@@ -36,6 +36,7 @@ namespace Constants {
     // Header toolbar
 
     inline const int HEADER_TOOL_BAR_HEIGHT_PX { 64 };
+    inline const int HEADER_TOOL_BAR_SIDE_MARGIN_PX { 20 };
     inline const int TOOL_BUTTON_SIZE_PX { 40 };
     inline const int TOOL_BUTTON_PADDING_PX { 8 };
     inline const int TOOL_BUTTON_MARGIN_X_PX { 4 };
@@ -62,6 +63,7 @@ namespace Constants {
     // --------------------------------------------------------------------------
     // Draw Tools bar
 
+    inline const int DRAW_TOOLS_SIDE_PANEL_WIDTH_PX { 400 };
     inline const QString DRAW_TOOL_BUTTON_PRESSED_COLOR { QStringLiteral("rgba(140, 228, 52, 38)") };
     inline const int DRAW_TOOLS_PANEL_HEIGHT_PX { 112 };
     inline const int DRAW_TOOLS_PANEL_MARGIN_SIDE_PX { 24 };
@@ -88,8 +90,21 @@ namespace Constants {
 
     inline const int ROUND_TOOL_BUTTON_PADDING_PX { 0 };
     inline const int ROUND_TOOL_BUTTON_BORDER_RADIUS_PX { 16 };
+    inline const int ROUND_TOOL_BUTTON_ICON_SIZE_PX { 24 };
 
-    inline const int ROUND_COMBO_BOX_DOWN_ARROW_SIZE { 22 };
+    inline const int ROUND_COMBO_BOX_WIDTH_PX { 52 };
+    inline const int ROUND_COMBO_BOX_HEIGHT_PX { 40 };
+    inline const int ROUND_COMBO_BOX_ICON_SIZE_PX { 32 };
+    inline const int ROUND_COMBO_BOX_DOWN_ARROW_WIDTH_PX { 14 };
+    inline const int ROUND_COMBO_BOX_DOWN_ARROW_HEIGHT_PX { 9 };
+    inline const int ROUND_COMBO_BOX_DOWN_ARROW_LEFT_SHIFT_PX { -10 };
+
+    // --------------------------------------------------------------------------
+    // Photo zone
+
+    inline const int PHOTO_ZONE_MARGIN_PX { 50 };
+    inline const QString PHOTO_ZONE_COLOR { QStringLiteral("#141415") };
+
 }
 
 #endif // CONSTANTS_H

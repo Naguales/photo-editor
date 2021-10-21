@@ -1,4 +1,5 @@
 #include "photoeditorwindow.h"
+#include "coloritemdelegate.h"
 #include "constants.h"
 
 #include <QHBoxLayout>
@@ -8,6 +9,14 @@
 #include <QValidator>
 #include <QRegExp>
 #include <QPainter>
+#include <QImageReader>
+#include <QMessageBox>
+#include <QGuiApplication>
+#include <QDir>
+#include <QColorSpace>
+#include <QFileDialog>
+#include <QStandardPaths>
+#include <QScreen>
 #include <QSignalBlocker>
 
 PhotoEditorWindow::PhotoEditorWindow(QWidget *parent)
@@ -19,7 +28,48 @@ PhotoEditorWindow::PhotoEditorWindow(QWidget *parent)
 }
 
 PhotoEditorWindow::~PhotoEditorWindow()
+{}
+
+void PhotoEditorWindow::openFile()
 {
+    QFileDialog fileDialog(this, tr("Open File"));
+
+    static bool initiaPhotoOpen = true;
+    if (initiaPhotoOpen) {
+        initiaPhotoOpen = false;
+        const QStringList picturesLocations = QStandardPaths::standardLocations(QStandardPaths::PicturesLocation);
+        fileDialog.setDirectory(picturesLocations.isEmpty() ? QDir::currentPath() : picturesLocations.last());
+    }
+
+    QStringList mimeTypeFilters;
+    const QByteArrayList supportedMimeTypes = QImageReader::supportedMimeTypes();
+    for (const QByteArray &mimeTypeName : supportedMimeTypes)
+        mimeTypeFilters.append(mimeTypeName);
+    mimeTypeFilters.sort();
+    fileDialog.setMimeTypeFilters(mimeTypeFilters);
+    fileDialog.selectMimeTypeFilter("image/jpeg");
+
+    while (fileDialog.exec() == QDialog::Accepted && !loadPhoto(fileDialog.selectedFiles().first())) {}
+}
+
+bool PhotoEditorWindow::loadPhoto(const QString& filePath)
+{
+    QImageReader photoReader;
+    photoReader.setAutoTransform(true);
+    const QImage newPhoto = photoReader.read();
+    if (newPhoto.isNull()) {
+        QMessageBox::information(this, QGuiApplication::applicationDisplayName(),
+                                 tr("Cannot load %1: %2").arg(QDir::toNativeSeparators(filePath), photoReader.errorString()));
+        return false;
+    }
+
+    m_photo = newPhoto;
+    if (m_photo.colorSpace().isValid())
+        m_photo.convertToColorSpace(QColorSpace::SRgb);
+    m_photoLabel->setPixmap(QPixmap::fromImage(m_photo));
+    m_photoScrollArea->setVisible(true);
+    m_photoLabel->adjustSize();
+    return true;
 }
 
 void PhotoEditorWindow::init()
@@ -45,6 +95,23 @@ void PhotoEditorWindow::init()
     setWindowIcon(QIcon(":/resources/svg/pe"));
     setWindowTitle(tr("Photo Editor 1.0"));
     setWindowFlags(windowFlags() | Qt::FramelessWindowHint);
+    setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
+
+    // Set minimum size for the Scanner Main Window.
+    const QSize preferredMinimumSize = QSize(qRound(1366 * m_scaleFactor), qRound(844 * m_scaleFactor));
+    QDesktopWidget* pDesktop = QApplication::desktop();
+    auto iWindowScreenNumber = pDesktop->screenNumber(this);
+    auto screens = QGuiApplication::screens();
+    const QRect availableGeometryRect = iWindowScreenNumber >= 0 && iWindowScreenNumber < screens.size() && screens[iWindowScreenNumber]
+            ? screens[iWindowScreenNumber]->availableGeometry() : QRect();
+    const QSize screenAvailableSize(availableGeometryRect.width(), availableGeometryRect.height());
+    if (!availableGeometryRect.isNull() && (preferredMinimumSize.width() > screenAvailableSize.width() || qRound(preferredMinimumSize.height() * 1.07) > screenAvailableSize.height())) {
+        setMinimumSize(screenAvailableSize);
+        showMaximized();
+    } else {
+        setMinimumSize(preferredMinimumSize);
+        resize(preferredMinimumSize);
+    }
 }
 void PhotoEditorWindow::createWidgets()
 {
@@ -121,6 +188,8 @@ void PhotoEditorWindow::createWidgets()
     m_headerToolBar->setMovable(false);
     m_headerToolBar->setFixedHeight(qRound(Constants::HEADER_TOOL_BAR_HEIGHT_PX * m_scaleFactor));
     m_headerToolBar->setStyleSheet(toolBarStyleSheet);
+    const int headerToolbarSideMargin = qRound(Constants::HEADER_TOOL_BAR_SIDE_MARGIN_PX * m_scaleFactor);
+    m_headerToolBar->setContentsMargins(headerToolbarSideMargin, 0, headerToolbarSideMargin, 0);
 
     m_openFileAction = new QAction(tr("Open file"), m_headerToolBar);
     m_openFileAction->setShortcuts(QKeySequence::Open);
@@ -174,8 +243,13 @@ void PhotoEditorWindow::createWidgets()
     // --------------------------------------------------------------------------
     // Draw Tools toolbar
 
-    QString drawToolsPanelStyleSheet = QString("QToolBar { background-color: %1; border-left: %2px solid %3; }")
-            .arg(Constants::TOOL_BAR_COLOR).arg(delimiterLineThickness).arg(Constants::DELIMITER_LINE_COLOR);
+    QString drawToolsPanelStyleSheet = QString("QToolBar { background-color: %1; }").arg(Constants::TOOL_BAR_COLOR),
+            drawToolsSidePanelStyleSheet = QString("QToolBar { background-color: %1; }").arg(Constants::TOOL_BAR_COLOR);
+
+    m_drawToolsSidePanel = new QWidget(this);
+    m_drawToolsSidePanel->setStyleSheet(drawToolsSidePanelStyleSheet);
+    m_drawToolsSidePanel->setFixedWidth(qRound(Constants::DRAW_TOOLS_SIDE_PANEL_WIDTH_PX * m_scaleFactor));
+
     m_drawToolsPanel = new QWidget(this);
     m_drawToolsPanel->setFixedHeight(qRound(Constants::DRAW_TOOLS_PANEL_HEIGHT_PX * m_scaleFactor));
     m_drawToolsPanel->setStyleSheet(drawToolsPanelStyleSheet);
@@ -264,6 +338,8 @@ void PhotoEditorWindow::createWidgets()
     m_pipetteToolButton = new QToolButton(m_drawToolsSettingsPanel);
     m_pipetteToolButton->setIcon(QIcon(":/resources/svg/pipette"));
     m_pipetteToolButton->setStyleSheet(sRoundToolButtonStyleSheet);
+    const int roundToolButtonIconSize = qRound(Constants::ROUND_TOOL_BUTTON_ICON_SIZE_PX * m_scaleFactor);
+    m_pipetteToolButton->setIconSize(QSize(roundToolButtonIconSize, roundToolButtonIconSize));
 
     m_colorDialog = new QColorDialog(this);
     auto colorDialogPalette = m_defaultSystemPalette;
@@ -273,6 +349,9 @@ void PhotoEditorWindow::createWidgets()
 
     m_colorCombobox = new QComboBox(m_drawToolsSettingsPanel);
     m_colorCombobox->setStyleSheet(sRoundComboboxStyleSheet);
+    m_colorCombobox->setItemDelegate(new ColorItemDelegate);
+    const int roundComboBoxIconSize = qRound(Constants::ROUND_COMBO_BOX_ICON_SIZE_PX * m_scaleFactor);
+    m_colorCombobox->setIconSize(QSize(roundComboBoxIconSize, roundComboBoxIconSize));
 
     // --------------------------------------------------------------------------
     // Footer toolbar
@@ -285,10 +364,17 @@ void PhotoEditorWindow::createWidgets()
     // --------------------------------------------------------------------------
     // Photo zone
 
-    m_photoScene = new QGraphicsScene(this);
-    m_photoView = new QGraphicsView(m_photoScene);
-    m_photoView->setStyleSheet(QString("QGraphicsView { margin: 50px; }"));
-    m_photoView->show();
+    const QString sPhotoScrollAreaStyleSheet = photoScrollAreaStyleSheet();
+
+    m_photoLabel = new QLabel(m_centralWidget);
+    m_photoLabel->setBackgroundRole(QPalette::Base);
+    m_photoLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+    m_photoLabel->setScaledContents(true);
+
+    m_photoScrollArea = new QScrollArea(m_centralWidget);
+    m_photoScrollArea->setStyleSheet(sPhotoScrollAreaStyleSheet);
+    m_photoScrollArea->setWidget(m_photoLabel);
+    m_photoLabel->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
 }
 
 void PhotoEditorWindow::createLayout()
@@ -303,7 +389,14 @@ void PhotoEditorWindow::createLayout()
         return horizontalLine;
     };
 
-    auto horizontalLineDrawTools = createHorizontalLine(m_drawToolsPanel);
+    auto createVerticallLine = [&](QWidget* parent){
+        auto horizontalLine = new QFrame(parent);
+        horizontalLine->setFrameStyle(QFrame::VLine | QFrame::Plain);
+        horizontalLine->setLineWidth(qRound(Constants::DELIMITER_LINE_THICKNESS_PX * m_scaleFactor));
+        horizontalLine->setStyleSheet(QString("QFrame { color: %1; } ").arg(Constants::DELIMITER_LINE_COLOR));
+        return horizontalLine;
+    };
+
     auto drawToolsVBoxLayout = new QVBoxLayout;
     drawToolsVBoxLayout->addWidget(m_drawToolsLabel);
     drawToolsVBoxLayout->addWidget(m_drawToolsBar);
@@ -312,7 +405,6 @@ void PhotoEditorWindow::createLayout()
     drawToolsVBoxLayout->setContentsMargins(drawToolsPanelMarginSide, drawToolsPanelMarginTop, drawToolsPanelMarginSide, drawToolsPanelMarginTop);
     m_drawToolsPanel->setLayout(drawToolsVBoxLayout);
 
-    auto horizontalLineDrawToolsSettings = createHorizontalLine(m_drawToolsSettingsPanel);
     auto opacityHBoxLayout = new QHBoxLayout;
     opacityHBoxLayout->addWidget(m_opacitySlider);
     opacityHBoxLayout->addWidget(m_opacityLineEdit);
@@ -330,15 +422,29 @@ void PhotoEditorWindow::createLayout()
     auto drawToolsSettingsVBoxLayout = new QVBoxLayout;
     drawToolsSettingsVBoxLayout->addLayout(opacityVBoxLayout);
     drawToolsSettingsVBoxLayout->addLayout(outlineHBoxLayout);
-    drawToolsSettingsVBoxLayout->addWidget(horizontalLineDrawToolsSettings);
 
     m_drawToolsSettingsPanel->setLayout(drawToolsSettingsVBoxLayout);
 
+    auto horizontalLineDrawTools = createHorizontalLine(m_drawToolsSidePanel);
+    auto horizontalLineDrawToolsSettings = createHorizontalLine(m_drawToolsSidePanel);
+    auto drawToolsPanelVBoxLayout = new QVBoxLayout;
+    drawToolsPanelVBoxLayout->addWidget(m_drawToolsPanel);
+    drawToolsPanelVBoxLayout->addWidget(horizontalLineDrawTools);
+    drawToolsPanelVBoxLayout->addWidget(m_drawToolsSettingsPanel);
+    drawToolsPanelVBoxLayout->addWidget(horizontalLineDrawToolsSettings);
+    drawToolsPanelVBoxLayout->addStretch(1);
+    drawToolsSettingsVBoxLayout->setContentsMargins(0, 0, 0, 0);
+    m_drawToolsSidePanel->setLayout(drawToolsPanelVBoxLayout);
+
+    auto mainAreaVerticalLine = createVerticallLine(this);
+    auto mainAreaHBoxLayout = new QHBoxLayout;
+    mainAreaHBoxLayout->addWidget(m_photoScrollArea);
+    mainAreaHBoxLayout->addWidget(mainAreaVerticalLine);
+    mainAreaHBoxLayout->addWidget(m_drawToolsSidePanel);
+
     m_mainLayout->addWidget(m_titleToolBar);
     m_mainLayout->addWidget(m_headerToolBar);
-    m_mainLayout->addWidget(m_drawToolsPanel);
-    m_mainLayout->addWidget(horizontalLineDrawTools);
-    m_mainLayout->addWidget(m_drawToolsSettingsPanel);
+    m_mainLayout->addLayout(mainAreaHBoxLayout);
     m_mainLayout->addWidget(m_footerToolBar);
 
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
@@ -381,7 +487,7 @@ void PhotoEditorWindow::createConnections()
         m_colorDialog->show();
     });
     connect(m_colorDialog, &QColorDialog::colorSelected, [&](const QColor& color) {
-        const int iconSize = m_colorCombobox->style()->pixelMetric(QStyle::PM_LargeIconSize) * 2;
+        const int iconSize = m_colorCombobox->style()->pixelMetric(QStyle::PM_LargeIconSize);
         QPixmap pixmap(iconSize, iconSize);
         pixmap.fill(QColor(255, 0, 0, 0));
         QPainter painter(&pixmap);
@@ -392,7 +498,6 @@ void PhotoEditorWindow::createConnections()
         QIcon icon(pixmap);
         const int itemsCount = m_colorCombobox->count();
         m_colorCombobox->addItem(icon, "");
-        m_colorCombobox->setItemData(itemsCount, Qt::AlignCenter, Qt::TextAlignmentRole);
         m_colorCombobox->setCurrentIndex(itemsCount);
     });
 }
@@ -535,19 +640,33 @@ QString PhotoEditorWindow::roundToolButtonStyleSheet()
 
 QString PhotoEditorWindow::roundComboboxStyleSheet()
 {
-    const int toolButtonSize = qRound(Constants::TOOL_BUTTON_SIZE_PX * m_scaleFactor),
-            toolButtonBorderRadius = qRound(Constants::ROUND_TOOL_BUTTON_BORDER_RADIUS_PX * m_scaleFactor),
-            roundComboboxDownArrowSize = qRound(Constants::ROUND_COMBO_BOX_DOWN_ARROW_SIZE * m_scaleFactor);
+    const int roundComboboxWidth = qRound(Constants::ROUND_COMBO_BOX_WIDTH_PX * m_scaleFactor),
+            roundComboboxHeight = qRound(Constants::ROUND_COMBO_BOX_HEIGHT_PX * m_scaleFactor),
+            roundComboboxBorderRadius = qRound(Constants::ROUND_TOOL_BUTTON_BORDER_RADIUS_PX * m_scaleFactor),
+            roundComboboxDownArrowWidth = qRound(Constants::ROUND_COMBO_BOX_DOWN_ARROW_WIDTH_PX * m_scaleFactor),
+            roundComboboxDownArrowHeight = qRound(Constants::ROUND_COMBO_BOX_DOWN_ARROW_HEIGHT_PX * m_scaleFactor),
+            roundComboboxDownArrowLeftShift = qRound(Constants::ROUND_COMBO_BOX_DOWN_ARROW_LEFT_SHIFT_PX * m_scaleFactor);
 
-    QString roundComboboxStyleSheet = QString("QComboBox { width: %1px; height: %1px; background-color: %2; border: 1px solid %2; border-radius: %3px; }")
-            .arg(toolButtonSize).arg(Constants::TOOL_BUTTON_REST_COLOR).arg(toolButtonBorderRadius);
+    QString roundComboboxStyleSheet = QString("QComboBox { width: %1px; height: %2px; background-color: %3; border: 1px solid %3; border-radius: %4px; }")
+            .arg(roundComboboxWidth).arg(roundComboboxHeight).arg(Constants::TOOL_BUTTON_REST_COLOR).arg(roundComboboxBorderRadius);
     roundComboboxStyleSheet.append(QString("QComboBox:hover { background-color: %1; border-color: %1; }")
                                 .arg(Constants::TOOL_BUTTON_HOVER_COLOR));
     roundComboboxStyleSheet.append(QString("QComboBox:pressed { background-color: %1; border-color: %1; }")
                                 .arg(Constants::TOOL_BUTTON_PRESSED_COLOR));
     roundComboboxStyleSheet.append(QString("QComboBox:disabled { background-color: %1; border-color: %1; }")
                                 .arg(Constants::TOOL_BUTTON_DISABLED_COLOR));
-    roundComboboxStyleSheet.append(QString("QComboBox:down-arrow { image: url(%1); width: %2px; height: %2px; }")
-                                .arg(":/resources/svg/down-arrow").arg(roundComboboxDownArrowSize));
+    roundComboboxStyleSheet.append(QString("QComboBox:down-arrow { image: url(%1); width: %2px; height: %3px; left: %4px; }")
+                                .arg(":/resources/svg/down-arrow").arg(roundComboboxDownArrowWidth)
+                                .arg(roundComboboxDownArrowHeight).arg(roundComboboxDownArrowLeftShift));
+    roundComboboxStyleSheet.append("QComboBox::drop-down:!editable { background: transparent; border: none; }");
     return roundComboboxStyleSheet;
 }
+
+ QString PhotoEditorWindow::photoScrollAreaStyleSheet()
+ {
+     const int photoScrollAreaMargin = qRound(Constants::PHOTO_ZONE_MARGIN_PX * m_scaleFactor);
+
+     QString photoScrollAreaStyleSheet = QString("QScrollArea { background-color: %1; margin: %2; border: 1px solid %1; }")
+             .arg(Constants::PHOTO_ZONE_COLOR).arg(photoScrollAreaMargin);
+     return photoScrollAreaStyleSheet;
+ }

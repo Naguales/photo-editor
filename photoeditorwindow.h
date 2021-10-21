@@ -14,8 +14,8 @@
 #include <QLineEdit>
 #include <QComboBox>
 #include <QColorDialog>
-#include <QGraphicsScene>
-#include <QGraphicsView>
+#include <QScrollArea>
+#include <QImage>
 #include <QVBoxLayout>
 
 class PhotoEditorWindow : public QMainWindow
@@ -34,6 +34,12 @@ public:
 
     PhotoEditorWindow(QWidget *parent = nullptr);
     ~PhotoEditorWindow();
+
+public slots:
+    void openFile();
+
+private slots:
+    bool loadPhoto(const QString& filePath);
 
 private:
     void init();
@@ -56,6 +62,7 @@ private:
     QString opacitySliderStyleSheet();
     QString roundToolButtonStyleSheet();
     QString roundComboboxStyleSheet();
+    QString photoScrollAreaStyleSheet();
 
     // --------------------------------------------------------------------------
     // Title toolbar
@@ -87,6 +94,7 @@ private:
     // --------------------------------------------------------------------------
     // Draw Tools bar
 
+    QWidget* m_drawToolsSidePanel { nullptr };
     QWidget* m_drawToolsPanel { nullptr };
     QLabel* m_drawToolsLabel { nullptr };
     QButtonGroup* m_drawToolsButtonGroup { nullptr };
@@ -119,8 +127,9 @@ private:
     // --------------------------------------------------------------------------
     // Photo zone
 
-    QGraphicsScene* m_photoScene { nullptr };
-    QGraphicsView* m_photoView { nullptr };
+    QImage m_photo;
+    QLabel *m_photoLabel { nullptr };
+    QScrollArea *m_photoScrollArea { nullptr };
 
     // --------------------------------------------------------------------------
     // Photo Editor window
