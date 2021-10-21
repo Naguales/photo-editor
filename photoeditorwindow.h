@@ -47,6 +47,8 @@ private:
     void createLayout();
     void createConnections();
 
+    QString fileMenuToolButtonStyleSheet();
+    QString fileMenuStyleSheet();
     QString titleIconToolButtonStyleSheet();
     QString titleToolButtonStyleSheet();
     QString systemToolButtonStyleSheet();
@@ -80,7 +82,7 @@ private:
     // Header toolbar
 
     QToolBar* m_headerToolBar { nullptr };
-    QMenuBar* m_menuBar { nullptr };
+    QToolButton* m_fileMenuToolButton { nullptr };
     QMenu* m_fileMenu { nullptr };
     QAction* m_openFileAction { nullptr };
     QAction* m_saveFileAction { nullptr };
@@ -120,16 +122,16 @@ private:
     QPalette m_defaultSystemPalette;
 
     // --------------------------------------------------------------------------
-    // Footer toolbar
-
-    QToolBar* m_footerToolBar { nullptr };
-
-    // --------------------------------------------------------------------------
     // Photo zone
 
     QImage m_photo;
     QLabel *m_photoLabel { nullptr };
     QScrollArea *m_photoScrollArea { nullptr };
+
+    // --------------------------------------------------------------------------
+    // Footer toolbar
+
+    QToolBar* m_footerToolBar { nullptr };
 
     // --------------------------------------------------------------------------
     // Photo Editor window

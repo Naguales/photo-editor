@@ -17,7 +17,9 @@
 #include <QFileDialog>
 #include <QStandardPaths>
 #include <QScreen>
+#include <QStatusBar>
 #include <QSignalBlocker>
+#include <QGridLayout>
 
 PhotoEditorWindow::PhotoEditorWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -49,12 +51,16 @@ void PhotoEditorWindow::openFile()
     fileDialog.setMimeTypeFilters(mimeTypeFilters);
     fileDialog.selectMimeTypeFilter("image/jpeg");
 
-    while (fileDialog.exec() == QDialog::Accepted && !loadPhoto(fileDialog.selectedFiles().first())) {}
+    auto retValue = fileDialog.exec();
+    if (retValue == QDialog::Accepted) {
+        auto selectedFiles = fileDialog.selectedFiles();
+        loadPhoto(selectedFiles.first());
+    }
 }
 
 bool PhotoEditorWindow::loadPhoto(const QString& filePath)
 {
-    QImageReader photoReader;
+    QImageReader photoReader(filePath);
     photoReader.setAutoTransform(true);
     const QImage newPhoto = photoReader.read();
     if (newPhoto.isNull()) {
@@ -96,6 +102,8 @@ void PhotoEditorWindow::init()
     setWindowTitle(tr("Photo Editor 1.0"));
     setWindowFlags(windowFlags() | Qt::FramelessWindowHint);
     setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
+    statusBar()->setSizeGripEnabled(true);
+    statusBar()->setStyleSheet(QString("QStatusBar { background-color: %1; }").arg(Constants::APP_BACKGROUND_COLOR));
 
     // Set minimum size for the Scanner Main Window.
     const QSize preferredMinimumSize = QSize(qRound(1366 * m_scaleFactor), qRound(844 * m_scaleFactor));
@@ -200,6 +208,7 @@ void PhotoEditorWindow::createWidgets()
     m_printAction = new QAction(tr("Print"), m_headerToolBar);
     m_printAction->setShortcuts(QKeySequence::Print);
 
+    const QString sFileMenuStyleSheet = fileMenuStyleSheet();
     m_fileMenu = new QMenu(tr("File"), m_headerToolBar);
     m_fileMenu->addAction(m_openFileAction);
     m_fileMenu->addSeparator();
@@ -207,9 +216,17 @@ void PhotoEditorWindow::createWidgets()
     m_fileMenu->addAction(m_saveAsFileAction);
     m_fileMenu->addSeparator();
     m_fileMenu->addAction(m_printAction);
+    m_fileMenu->setStyleSheet(sFileMenuStyleSheet);
+    m_fileMenu->setFixedWidth(qRound(Constants::FILE_MENU_WIDTH_PX * m_scaleFactor));
 
-    m_menuBar = new QMenuBar(m_headerToolBar);
-    m_menuBar->addMenu(m_fileMenu);
+    const QString sFileMenuToolButtonStyleSheet = fileMenuToolButtonStyleSheet();
+    auto fileMenuToolButtonFont = font();
+    m_fileMenuToolButton = new QToolButton(m_headerToolBar);
+    m_fileMenuToolButton->setFont(fileMenuToolButtonFont);
+    m_fileMenuToolButton->setText(tr("File"));
+    m_fileMenuToolButton->setMenu(m_fileMenu);
+    m_fileMenuToolButton->setPopupMode(QToolButton::MenuButtonPopup);
+    m_fileMenuToolButton->setStyleSheet(sFileMenuToolButtonStyleSheet);
 
     m_undoButton = new QToolButton(m_headerToolBar);
     m_undoButton->setIcon(QIcon(":/resources/svg/undo"));
@@ -229,11 +246,7 @@ void PhotoEditorWindow::createWidgets()
 
     QWidget* headerSpacer = new QWidget(m_headerToolBar);
     headerSpacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    auto menuBarVBoxLayout = new QVBoxLayout;
-    menuBarVBoxLayout->setMenuBar(m_menuBar);
-    auto menuBarWidget = new QWidget(m_headerToolBar);
-    menuBarWidget->setLayout(menuBarVBoxLayout);
-    m_headerToolBar->addWidget(menuBarWidget);
+    m_headerToolBar->addWidget(m_fileMenuToolButton);
     m_headerToolBar->addWidget(m_undoButton);
     m_headerToolBar->addWidget(m_redoButton);
     m_headerToolBar->addWidget(m_resetButton);
@@ -352,29 +365,36 @@ void PhotoEditorWindow::createWidgets()
     m_colorCombobox->setItemDelegate(new ColorItemDelegate);
     const int roundComboBoxIconSize = qRound(Constants::ROUND_COMBO_BOX_ICON_SIZE_PX * m_scaleFactor);
     m_colorCombobox->setIconSize(QSize(roundComboBoxIconSize, roundComboBoxIconSize));
-
-    // --------------------------------------------------------------------------
-    // Footer toolbar
-
-    m_footerToolBar = new QToolBar(m_centralWidget);
-    m_footerToolBar->setMovable(false);
-    m_footerToolBar->setFixedHeight(qRound(Constants::HEADER_TOOL_BAR_HEIGHT_PX * m_scaleFactor));
-    m_footerToolBar->setStyleSheet(toolBarStyleSheet);
+    m_colorCombobox->setMaxCount(10);
 
     // --------------------------------------------------------------------------
     // Photo zone
 
-    const QString sPhotoScrollAreaStyleSheet = photoScrollAreaStyleSheet();
+    const QString sPhotoScrollAreaStyleSheet = photoScrollAreaStyleSheet(),
+            sPhotoLabelStyleSheet = QString("QLabel { background-color: %1; }").arg(Constants::PHOTO_ZONE_COLOR);
 
     m_photoLabel = new QLabel(m_centralWidget);
     m_photoLabel->setBackgroundRole(QPalette::Base);
-    m_photoLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
     m_photoLabel->setScaledContents(true);
+    m_photoLabel->setStyleSheet(sPhotoLabelStyleSheet);
+    m_photoLabel->setAlignment(Qt::AlignCenter);
 
     m_photoScrollArea = new QScrollArea(m_centralWidget);
     m_photoScrollArea->setStyleSheet(sPhotoScrollAreaStyleSheet);
     m_photoScrollArea->setWidget(m_photoLabel);
-    m_photoLabel->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
+    m_photoScrollArea->setAlignment(Qt::AlignCenter);
+    m_photoScrollArea->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
+
+    // --------------------------------------------------------------------------
+    // Footer toolbar
+
+    const QString footerToolBarStyleSheet = QString("QToolBar { background-color: %1; border-top: %2px solid %3; }")
+            .arg(Constants::TOOL_BAR_COLOR).arg(delimiterLineThickness).arg(Constants::DELIMITER_LINE_COLOR);
+
+    m_footerToolBar = new QToolBar(m_centralWidget);
+    m_footerToolBar->setMovable(false);
+    m_footerToolBar->setFixedHeight(qRound(Constants::FOOTER_TOOL_BAR_HEIGHT_PX * m_scaleFactor));
+    m_footerToolBar->setStyleSheet(footerToolBarStyleSheet);
 }
 
 void PhotoEditorWindow::createLayout()
@@ -500,6 +520,28 @@ void PhotoEditorWindow::createConnections()
         m_colorCombobox->addItem(icon, "");
         m_colorCombobox->setCurrentIndex(itemsCount);
     });
+    connect(m_openFileAction, &QAction::triggered, this, &PhotoEditorWindow::openFile);
+}
+
+QString PhotoEditorWindow::fileMenuToolButtonStyleSheet()
+{
+    QString fileMenuToolButtonStyleSheet = QString("QToolButton { color: %1; }").arg(Constants::FILE_TOOL_BUTTON_COLOR);
+    fileMenuToolButtonStyleSheet.append(QString("QToolButton::menu-indicator { image: url(:/resources/svg/down-arrow); }"));
+    return fileMenuToolButtonStyleSheet;
+}
+
+QString PhotoEditorWindow::fileMenuStyleSheet()
+{
+    const int fileMenuSeparatorHeight = qRound(Constants::FILE_MENU_SEPARATOR_HEIGHT_PX * m_scaleFactor),
+            fileMenuItemPadding = qRound(Constants::FILE_MENU_ITEM_PADDING_PX * m_scaleFactor);
+
+    QString fileMenuStyleSheet = QString("QMenu { background-color: %1; color: %2; }")
+            .arg(Constants::FILE_TOOL_BUTTON_COLOR, Constants::FILE_MENU_COLOR);
+    fileMenuStyleSheet.append(QString("QMenu::item { padding: %1px; }").arg(fileMenuItemPadding));
+    fileMenuStyleSheet.append(QString("QMenu::item:selected { background-color: lightgrey; }"));
+    fileMenuStyleSheet.append(QString("QMenu::separator { height: %1px; background: %1; }")
+                              .arg(fileMenuSeparatorHeight).arg(Constants::FILE_MENU_SEPARATOR_COLOR));
+    return fileMenuStyleSheet;
 }
 
 QString PhotoEditorWindow::titleIconToolButtonStyleSheet()

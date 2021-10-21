@@ -41,6 +41,12 @@ namespace Constants {
     inline const int TOOL_BUTTON_PADDING_PX { 8 };
     inline const int TOOL_BUTTON_MARGIN_X_PX { 4 };
     inline const int TOOL_BUTTON_BORDER_RADIUS_PX { 4 };
+    inline const int FILE_MENU_WIDTH_PX { 240 };
+    inline const int FILE_MENU_SEPARATOR_HEIGHT_PX { 2 };
+    inline const int FILE_MENU_ITEM_PADDING_PX { 11 };
+    inline const QString FILE_TOOL_BUTTON_COLOR { QStringLiteral("#FFFFFF") };
+    inline const QString FILE_MENU_COLOR { QStringLiteral("#000000") };
+    inline const QString FILE_MENU_SEPARATOR_COLOR { QStringLiteral("#F3F3F3") };
     inline const QString TOOL_BAR_COLOR { QStringLiteral("#1D1D1E") };
     inline const QString TOOL_BUTTON_REST_COLOR { QStringLiteral("#2A2B2C") };
     inline const QString TOOL_BUTTON_HOVER_COLOR { QStringLiteral("#3C3D3F") };
@@ -104,6 +110,11 @@ namespace Constants {
 
     inline const int PHOTO_ZONE_MARGIN_PX { 50 };
     inline const QString PHOTO_ZONE_COLOR { QStringLiteral("#141415") };
+
+    // --------------------------------------------------------------------------
+    // Header toolbar
+
+    inline const int FOOTER_TOOL_BAR_HEIGHT_PX { 40 };
 
 }
 
